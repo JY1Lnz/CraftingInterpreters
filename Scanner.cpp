@@ -25,11 +25,52 @@ void Scanner::scanToken() {
   case '(':
     addToken(TT::LEFT_PAREN);
     break;
-  case '=':
-    addToken(match('=') ? TT::EQUAL_EQUAL : TT::EQUAL);
+  case ')':
+    addToken(TT::RIGHT_PAREN);
+    break;
+  case '{':
+    addToken(TT::LEFT_BRACE);
+    break;
+  case '}':
+    addToken(TT::RIGHT_BRACE);
+    break;
+  case ',':
+    addToken(TT::COMMA);
+    break;
+  case '.':
+    addToken(TT::DOT);
+    break;
+  case '-':
+    addToken(TT::MINUS);
+    break;
+  case '+':
+    addToken(TT::PLUS);
+    break;
+  case ';':
+    addToken(TT::SEMICOLON);
+    break;
+  case '*':
+    addToken(TT::STAR);
     break;
   case '!':
     addToken(match('=') ? TT::BANG_EQUAL : TT::BANG);
+    break;
+  case '=':
+    addToken(match('=') ? TT::EQUAL_EQUAL : TT::EQUAL);
+    break;
+  case '<':
+    addToken(match('=') ? TT::LESS_EQUAL : TT::LESS);
+    break;
+  case '>':
+    addToken(match('=') ? TT::GREATER_EQUAL : TT::GREATER);
+    break;
+  case '/':
+    if (match('/')) {
+      while (peek() != '\n' && !isAtEnd()) advance();
+    }
+    else {
+      addToken(TT::SLASH);
+    }
     break;
   case ' ':
   case '\r':

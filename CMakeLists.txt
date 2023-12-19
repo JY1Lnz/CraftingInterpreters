@@ -7,5 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_executable(${PROJECT_NAME} 
   Main.cpp
+  Scanner.hpp
   Scanner.cpp 
+  Context.hpp
   Context.cpp)
