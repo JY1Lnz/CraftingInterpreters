@@ -76,3 +76,4 @@ __pycache__
 libclc/*
 libcxx/*
 *.tmp
+test.lx

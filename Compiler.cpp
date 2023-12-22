@@ -137,7 +137,10 @@ void Parser::grouping() {
   consume(TT::RIGHT_PAREN, "Expect ')' after expression.");
 }
 
-void Parser::expression() { parsePrecedence(Precedence::ASSIGNMENT); }
+void Parser::expression() {
+  // all file is a assignment token
+  parsePrecedence(Precedence::ASSIGNMENT);
+}
 
 uint8_t Parser::makeConstant(double value) {
   int constant = ch->addConstant(value);
@@ -181,13 +184,16 @@ void Parser::emitConstant(double value) {
 }
 
 void Parser::parsePrecedence(Precedence prec) {
+  // get the next token, put current token in previous.
   advance();
+  // The first operand is prefix operand, so do the prefix op
   ParseFn prefixRule = getRule(previous.getType()).prefix;
   if (prefixRule == nullptr) {
     error(*this, "Expect expression.");
     return;
   }
   (this->*prefixRule)();
+  // try to check is or not a binary op
   while (prec <= getRule(current.type).precedence) {
     advance();
     ParseFn infixRule = getRule(previous.type).infix;
@@ -206,7 +212,6 @@ void Parser::number() {
 
 void Parser::unary() {
   TT op = previous.getType();
-  expression();
   parsePrecedence(Precedence::UNARY);
   switch (op) {
   case TT::MINUS:
