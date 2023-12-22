@@ -2,15 +2,22 @@
 
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
-namespace jlox {
+namespace clox {
 
 class Scanner;
+class Parser;
+class Chunk;
 
 class Token {
 private:
   friend class Scanner;
+  friend class Parser;
+  friend void errorAt(const Token &token, const char *msg);
+  friend bool compile(const char *source, Chunk &chunk);
 
+public:
   enum class Type {
     // Single-character tokens.
     LEFT_PAREN,
@@ -59,18 +66,35 @@ private:
     WHILE,
 
     // Other
+    ERROR,
     END,
+    COUNT,
+    NONE,
   };
 
+private:
   Type type;
+  const char *start;
+  int length;
+  int line;
+
   std::string_view lexeme;
   union {
     std::string_view string;
     double number{0};
   };
-  int line;
 
 public:
+  static std::unordered_map<std::string_view, Type> reservedWord;
+  static Type findType(std::string_view iden);
+
+public:
+  static Token makeToken(Type type, const char *start, int length, int line);
+
+public:
+  Token();
+  Token(Type type, const char *start, int length, int line);
+
   Token(Type type, std::string_view lexeme, int line)
       : type{type}, lexeme{std::move(lexeme)}, line{line} {}
   Token(Type type, std::string_view lexeme, std::string_view string, int line)
@@ -78,8 +102,11 @@ public:
         line{line} {}
   Token(Type type, std::string_view lexeme, double number, int line)
       : type{type}, lexeme{std::move(lexeme)}, number{number}, line{line} {}
+  int getLine() const { return line; }
+  Type getType() const { return type; }
+  const char *getStart() const { return start; }
 
   // const std::string toString() const {
   // }
 };
-} // namespace jlox
+} // namespace clox

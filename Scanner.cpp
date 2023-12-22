@@ -1,173 +1,170 @@
 #include "Scanner.hpp"
 #include "Token.hpp"
+#include "VirtualMachine.hpp"
 #include <cctype>
+#include <cinttypes>
+#include <cstring>
 #include <string_view>
-#include <variant>
+#include <unordered_map>
 
-using namespace jlox;
+using namespace clox;
 
-bool Scanner::isAtEnd() { return current >= getText().length(); }
+static bool isAlpha(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
 
-std::string_view Scanner::getText() const { return context->getText(); }
+static bool isDigit(char c) { return c >= '0' && c <= '9'; }
 
-char Scanner::peek() const { return getText().at(current); }
+bool Scanner::isAtEnd() const { return *current == '\0'; }
+
+char Scanner::advance() { return *current++; }
+
+char Scanner::peek() const { return *current; }
 
 char Scanner::peekNext() const {
-  if (current + 1 >= getText().length())
-    return '\0';
-  return getText().at(current + 1);
+  if (isAtEnd())
+    return 0;
+  return *(current + 1);
 }
 
-void Scanner::scanToken() {
-  using TT = Token::Type;
-  char c = advance();
-  switch (c) {
-  case '(':
-    addToken(TT::LEFT_PAREN);
-    break;
-  case ')':
-    addToken(TT::RIGHT_PAREN);
-    break;
-  case '{':
-    addToken(TT::LEFT_BRACE);
-    break;
-  case '}':
-    addToken(TT::RIGHT_BRACE);
-    break;
-  case ',':
-    addToken(TT::COMMA);
-    break;
-  case '.':
-    addToken(TT::DOT);
-    break;
-  case '-':
-    addToken(TT::MINUS);
-    break;
-  case '+':
-    addToken(TT::PLUS);
-    break;
-  case ';':
-    addToken(TT::SEMICOLON);
-    break;
-  case '*':
-    addToken(TT::STAR);
-    break;
-  case '!':
-    addToken(match('=') ? TT::BANG_EQUAL : TT::BANG);
-    break;
-  case '=':
-    addToken(match('=') ? TT::EQUAL_EQUAL : TT::EQUAL);
-    break;
-  case '<':
-    addToken(match('=') ? TT::LESS_EQUAL : TT::LESS);
-    break;
-  case '>':
-    addToken(match('=') ? TT::GREATER_EQUAL : TT::GREATER);
-    break;
-  case '/':
-    if (match('/')) {
-      while (peek() != '\n' && !isAtEnd()) advance();
-    }
-    else {
-      addToken(TT::SLASH);
-    }
-    break;
-  case ' ':
-  case '\r':
-  case '\t':
-    break;
-  case '\n':
-    line++;
-    break;
-  case '"':
-    string();
-    break;
-  default:
-    if (std::isalpha(c)) {
-      identifier();
-    } else if (std::isdigit(c)) {
-      number();
-    } else {
-      hadError = true;
-    }
-    break;
-  }
+Token Scanner::makeToken(Token::Type type) {
+  return Token::makeToken(type, start, static_cast<int>(current - start), line);
 }
 
-char Scanner::advance() { return getText().at(current++); }
-
-void Scanner::addToken(Token::Type type) {
-  tokenList.emplace_back(type, getText().substr(start, current - start), line);
-}
-
-void Scanner::addToken(Token::Type type, std::string_view string) {
-  tokenList.emplace_back(type, getText().substr(start, current - start),
-                         std::move(string), line);
-}
-
-void Scanner::addToken(Token::Type type, double number) {
-  tokenList.emplace_back(type, getText().substr(start, current - start), number,
-                         line);
+Token Scanner::makeErrorToken(Token::Type type, const char *msg) {
+  return Token::makeToken(type, msg, strlen(msg), line);
 }
 
 bool Scanner::match(char expected) {
   if (isAtEnd())
     return false;
-  if (peek() != expected)
+  if (*current != expected)
     return false;
   current++;
   return true;
 }
 
-void Scanner::string() {
-  while (peek() != '"' && !isAtEnd()) {
-    if (peek() == '\n') {
+void Scanner::skipWhiteSpace() {
+  while (true) {
+    char c = peek();
+    switch (c) {
+    case ' ':
+    case '\t':
+    case '\r':
+      advance();
+      break;
+    case '\n':
       line++;
+      advance();
+      break;
+    case '/':
+      if (peekNext() == '/') {
+        while (peek() != '\n' && !isAtEnd())
+          advance();
+      } else {
+        return;
+      }
+      break;
+    default:
+      return;
     }
+  }
+}
+
+Token Scanner::toString() {
+  while (peek() != '"' && !isAtEnd()) {
+    if (peek() == '\n')
+      line++;
     advance();
   }
 
-  // TODO: Error
-  if (isAtEnd()) {
-    hadError = true;
-    return;
-  }
-
-  // eat closing ".
+  if (isAtEnd())
+    return makeErrorToken(Token::Type::ERROR, "Unterminated string.");
+  // eat `"`
   advance();
-  addToken(Token::Type::STRING,
-           getText().substr(start + 1, current - start - 2));
+  return makeToken(Token::Type::STRING);
 }
 
-void Scanner::identifier() {
-  while (std::isalpha(peek()) || std::isdigit(peek())) {
+Token Scanner::toNumber() {
+  while (isdigit(peek()))
     advance();
-  }
-  addToken(Token::Type::IDENTIFIER);
-}
-
-void Scanner::number() {
-  while (!isAtEnd() && std::isdigit(peek())) {
-    advance();
-  }
-  // Look for a fractional part.
-  if (!isAtEnd() && peek() == '.' && std::isdigit(peekNext())) {
-    // eat .
+  if (peek() == '.' && isdigit(peekNext())) {
     advance();
 
-    while (std::isdigit(peek()))
+    while (isdigit(peek()))
       advance();
   }
-
-  // TODO: use more safety method
-  addToken(Token::Type::NUMBER,
-           std::stod(getText().substr(start, current - start).data()));
+  return makeToken(Token::Type::NUMBER);
 }
 
-void Scanner::run() {
-  while (!isAtEnd()) {
-    start = current;
-    scanToken();
+Token Scanner::toIdentifier() {
+  while (isAlpha(peek()) || isDigit(peek()))
+    advance();
+  return makeToken(identifierType());
+}
+
+Token::Type Scanner::identifierType() {
+  return Token::findType(
+      std::string_view{start, static_cast<size_t>(current - start)});
+}
+
+void Scanner::init(const char *source) {
+  start = source;
+  current = source;
+  line = 1;
+}
+
+Token Scanner::scanToken() {
+  using TT = Token::Type;
+  skipWhiteSpace();
+  start = current;
+  if (isAtEnd())
+    return makeToken(TT::END);
+  char c = advance();
+
+  if (isdigit(c))
+    return toNumber();
+
+  if (isAlpha(c))
+    return toIdentifier();
+
+  switch (c) {
+  case '(':
+    return makeToken(TT::LEFT_PAREN);
+  case ')':
+    return makeToken(TT::RIGHT_PAREN);
+  case '{':
+    return makeToken(TT::LEFT_BRACE);
+  case '}':
+    return makeToken(TT::RIGHT_BRACE);
+  case ';':
+    return makeToken(TT::SEMICOLON);
+  case ',':
+    return makeToken(TT::COMMA);
+  case '.':
+    return makeToken(TT::DOT);
+  case '-':
+    return makeToken(TT::MINUS);
+  case '+':
+    return makeToken(TT::PLUS);
+  case '/':
+    return makeToken(TT::SLASH);
+  case '*':
+    return makeToken(TT::STAR);
+  case '!':
+    return makeToken(match('=') ? TT::BANG_EQUAL : TT::BANG);
+  case '=':
+    return makeToken(match('=') ? TT::EQUAL_EQUAL : TT::EQUAL);
+  case '<':
+    return makeToken(match('=') ? TT::LESS_EQUAL : TT::LESS);
+  case '>':
+    return makeToken(match('=') ? TT::GREATER_EQUAL : TT::GREATER);
+  case '"':
+    return toString();
+  default:
+    break;
   }
-  tokenList.emplace_back(Token::Type::END, "", line);
+
+  return Token::makeToken(Token::Type::ERROR, "Unexpected character.", 21,
+                          line);
 }
