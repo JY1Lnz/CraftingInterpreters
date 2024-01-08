@@ -13,7 +13,6 @@ enum class InterpretResult {
   INTERPRET_RUNTIME_ERROR,
 };
 
-
 class Chunk;
 
 class VirtualMachine {
@@ -23,8 +22,12 @@ private:
   Value stack[STACK_MAC];
   Value *stackTop{nullptr};
 
+protected:
+  bool isFalsey(Value value);
+  bool valueEqual(Value a, Value b) const;
+
 public:
-  VirtualMachine();
+  explicit VirtualMachine();
 
   void init();
   void reset();
@@ -34,7 +37,11 @@ public:
   Value pop();
   Value top();
 
+  const Value &peek(int dis);
+
   InterpretResult interpret(Chunk *chunk);
   InterpretResult run();
+
+  void runtimeError(const char *format, ...);
 };
 } // namespace clox

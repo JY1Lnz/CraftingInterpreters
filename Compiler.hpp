@@ -67,6 +67,7 @@ public:
   void number();
   void unary();
   void binary();
+  void literal();
 };
 
 bool compile(const char *source, Chunk &chunk);

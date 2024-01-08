@@ -40,31 +40,31 @@ static std::array<ParseRule, static_cast<uint>(Token::Type::COUNT)> relus{{
     {nullptr, nullptr, Precedence::NONE},                // SEMICOLON
     {nullptr, &Parser::binary, Precedence::FACTOR},      // SLASH
     {nullptr, &Parser::binary, Precedence::FACTOR},      // STAR
-    {nullptr, nullptr, Precedence::NONE},                // BANG
-    {nullptr, nullptr, Precedence::NONE},                // BANG_EQUAL
+    {&Parser::unary, nullptr, Precedence::NONE},         // BANG
+    {nullptr, &Parser::binary, Precedence::EQUALITY},    // BANG_EQUAL
     {nullptr, nullptr, Precedence::NONE},                // EQUAL
-    {nullptr, nullptr, Precedence::NONE},                // EQUAL_EQUAL
-    {nullptr, nullptr, Precedence::NONE},                // GREATER
-    {nullptr, nullptr, Precedence::NONE},                // GREATER_EQUAL
-    {nullptr, nullptr, Precedence::NONE},                // LESS
-    {nullptr, nullptr, Precedence::NONE},                // LESS_EQUAL
+    {nullptr, &Parser::binary, Precedence::EQUALITY},    // EQUAL_EQUAL
+    {nullptr, &Parser::binary, Precedence::COMPARISON},  // GREATER
+    {nullptr, &Parser::binary, Precedence::COMPARISON},  // GREATER_EQUAL
+    {nullptr, &Parser::binary, Precedence::COMPARISON},  // LESS
+    {nullptr, &Parser::binary, Precedence::COMPARISON},  // LESS_EQUAL
     {nullptr, nullptr, Precedence::NONE},                // IDENTIFIER
     {nullptr, nullptr, Precedence::NONE},                // STRING
     {&Parser::number, nullptr, Precedence::NONE},        // NUMBER
     {nullptr, nullptr, Precedence::NONE},                // AND
     {nullptr, nullptr, Precedence::NONE},                // CLASS
     {nullptr, nullptr, Precedence::NONE},                // ELSE
-    {nullptr, nullptr, Precedence::NONE},                // FALSE
+    {&Parser::literal, nullptr, Precedence::NONE},       // FALSE
     {nullptr, nullptr, Precedence::NONE},                // FOR
     {nullptr, nullptr, Precedence::NONE},                // FUN
     {nullptr, nullptr, Precedence::NONE},                // IF
-    {nullptr, nullptr, Precedence::NONE},                // NIL
+    {&Parser::literal, nullptr, Precedence::NONE},       // NIL
     {nullptr, nullptr, Precedence::NONE},                // OR
     {nullptr, nullptr, Precedence::NONE},                // PRINT
     {nullptr, nullptr, Precedence::NONE},                // RETURN
     {nullptr, nullptr, Precedence::NONE},                // SUPER
     {nullptr, nullptr, Precedence::NONE},                // THIS
-    {nullptr, nullptr, Precedence::NONE},                // TRUE
+    {&Parser::literal, nullptr, Precedence::NONE},       // TRUE
     {nullptr, nullptr, Precedence::NONE},                // VAR
     {nullptr, nullptr, Precedence::NONE},                // WHILE
     {nullptr, nullptr, Precedence::NONE},                // ERROR
@@ -143,7 +143,7 @@ void Parser::expression() {
 }
 
 uint8_t Parser::makeConstant(double value) {
-  int constant = ch->addConstant(value);
+  int constant = ch->addConstant(Value{value});
   if (constant > UINT8_MAX) {
     error(*this, "Too many constants in one chunk.");
     return 0;
@@ -217,6 +217,9 @@ void Parser::unary() {
   case TT::MINUS:
     emitByte(OpCode::NEGATE);
     break;
+  case TT::BANG:
+    emitByte(OpCode::NOT);
+    break;
   default:
     return;
   }
@@ -228,6 +231,24 @@ void Parser::binary() {
   parsePrecedence(
       static_cast<Precedence>(static_cast<uint>(rule.precedence) + 1));
   switch (operatorType) {
+  case TT::BANG_EQUAL:
+    emitBytes(OpCode::EQUAL, OpCode::NOT);
+    break;
+  case TT::EQUAL_EQUAL:
+    emitByte(OpCode::EQUAL);
+    break;
+  case TT::GREATER:
+    emitByte(OpCode::GREATER);
+    break;
+  case TT::GREATER_EQUAL:
+    emitBytes(OpCode::LESS, OpCode::NOT);
+    break;
+  case TT::LESS:
+    emitByte(OpCode::LESS);
+    break;
+  case TT::LESS_EQUAL:
+    emitBytes(OpCode::GREATER, OpCode::NOT);
+    break;
   case TT::PLUS:
     emitByte(OpCode::ADD);
     break;
@@ -239,6 +260,22 @@ void Parser::binary() {
     break;
   case TT::SLASH:
     emitByte(OpCode::DIVIDE);
+    break;
+  default:
+    return;
+  }
+}
+
+void Parser::literal() {
+  switch (previous.type) {
+  case TT::TRUE:
+    emitByte(OpCode::TRUE);
+    break;
+  case TT::FALSE:
+    emitByte(OpCode::FALSE);
+    break;
+  case TT::NIL:
+    emitByte(OpCode::NIL);
     break;
   default:
     return;

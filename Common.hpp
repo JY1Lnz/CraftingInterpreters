@@ -9,10 +9,17 @@ namespace clox {
 
 enum class OpCode : uint8_t {
   CONSTANT,
+  NIL,
+  TRUE,
+  FALSE,
+  EQUAL,
+  GREATER,
+  LESS,
   ADD,
   SUBTRACT,
   MULTIPLY,
   DIVIDE,
+  NOT,
   NEGATE,
   RETURN,
 };

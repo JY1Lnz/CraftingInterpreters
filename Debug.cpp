@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <iomanip>
 #include <iostream>
+#include <ostream>
 
 using namespace clox;
 
@@ -31,6 +32,18 @@ int Disassembler::disassemblerInstr(const Chunk &chunk, int offset) {
     return simpleInstr("OP_RETURN", offset);
   case OpCode::CONSTANT:
     return constantInstr("OP_CONSTANT", chunk, offset);
+  case OpCode::NIL:
+    return simpleInstr("OP_NIL", offset);
+  case OpCode::TRUE:
+    return simpleInstr("OP_TRUE", offset);
+  case OpCode::FALSE:
+    return simpleInstr("OP_FALSE", offset);
+  case OpCode::EQUAL:
+    return simpleInstr("OP_EQUAL", offset);
+  case OpCode::GREATER:
+    return simpleInstr("OP_GREATER", offset);
+  case OpCode::LESS:
+    return simpleInstr("OP_LESS", offset);
   case OpCode::ADD:
     return simpleInstr("OP_ADD", offset);
   case OpCode::SUBTRACT:
@@ -39,6 +52,8 @@ int Disassembler::disassemblerInstr(const Chunk &chunk, int offset) {
     return simpleInstr("OP_MULTIPLY", offset);
   case OpCode::DIVIDE:
     return simpleInstr("OP_DIVIDE", offset);
+  case OpCode::NOT:
+    return simpleInstr("OP_NOT", offset);
   case OpCode::NEGATE:
     return simpleInstr("OP_NEGATE", offset);
   default:
